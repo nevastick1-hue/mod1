@@ -1,19 +1,93 @@
-name: Build Forge Mod
+name: Build Patched Tooltip Overhaul
 on:
-  push:
   workflow_dispatch:
+  push:
+    branches: [ main ]
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: Xylonity/Tooltip-Overhaul
+          ref: 1.20.1-4/rewrite
+          path: upstream
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
-      - uses: gradle/actions/setup-gradle@v4
-      - run: gradle build --no-daemon
+          java-version: '21'
+      - name: Apply tooltip area patch
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          cfg=Path("upstream/common/src/main/java/dev/xylonity/tooltipoverhaul/config/TooltipsConfig.java")
+          s=cfg.read_text()
+          marker='    public static int TOOLTIP_POSITION_X = 0;'
+          add='''
+
+    @ConfigEntry(category = "layout", comment = "Enable a custom rectangular area that constrains the main tooltip.")
+    public static boolean TOOLTIP_AREA_ENABLED = true;
+    @ConfigEntry(category = "layout", comment = "Restrict tooltip horizontally inside the custom area.")
+    public static boolean TOOLTIP_AREA_RESTRICT_X = true;
+    @ConfigEntry(category = "layout", comment = "Restrict tooltip vertically inside the custom area.")
+    public static boolean TOOLTIP_AREA_RESTRICT_Y = true;
+    @ConfigEntry(category = "layout", comment = "Left boundary of the tooltip area in GUI pixels.")
+    public static int TOOLTIP_AREA_LEFT = 950;
+    @ConfigEntry(category = "layout", comment = "Top boundary of the tooltip area in GUI pixels.")
+    public static int TOOLTIP_AREA_TOP = 80;
+    @ConfigEntry(category = "layout", comment = "Right margin of the tooltip area in GUI pixels.")
+    public static int TOOLTIP_AREA_RIGHT = 30;
+    @ConfigEntry(category = "layout", comment = "Bottom margin of the tooltip area in GUI pixels.")
+    public static int TOOLTIP_AREA_BOTTOM = 80;'''
+          if "TOOLTIP_AREA_ENABLED" not in s:
+              s=s.replace(marker, marker+add)
+              cfg.write_text(s)
+          p=Path("upstream/common/src/main/java/dev/xylonity/tooltipoverhaul/client/layout/TooltipPositionCalculator.java")
+          s=p.read_text()
+          marker='''            if (posY < paddingY) {
+                posY = paddingY;
+            }
+
+        }
+        else {'''
+          repl='''            if (posY < paddingY) {
+                posY = paddingY;
+            }
+
+            // Custom tooltip area: preserve normal cursor-following, then clamp inside user-defined region.
+            if (TooltipsConfig.TOOLTIP_AREA_ENABLED) {
+                if (TooltipsConfig.TOOLTIP_AREA_RESTRICT_X) {
+                    float minX = TooltipsConfig.TOOLTIP_AREA_LEFT;
+                    float maxX = Math.max(minX, screenWidth - TooltipsConfig.TOOLTIP_AREA_RIGHT - tooltipWidth);
+                    posX = Math.max(minX, Math.min(maxX, posX));
+                }
+                if (TooltipsConfig.TOOLTIP_AREA_RESTRICT_Y) {
+                    float minY = TooltipsConfig.TOOLTIP_AREA_TOP;
+                    float maxY = Math.max(minY, screenHeight - TooltipsConfig.TOOLTIP_AREA_BOTTOM - tooltipHeight);
+                    posY = Math.max(minY, Math.min(maxY, posY));
+                }
+            }
+
+        }
+        else {'''
+          if "Custom tooltip area:" not in s:
+              if marker not in s: raise SystemExit("calculator anchor missing")
+              s=s.replace(marker,repl)
+              p.write_text(s)
+          PY
+      - name: Build Forge
+        working-directory: upstream
+        run: |
+          chmod +x gradlew
+          ./gradlew :forge:build --no-daemon
+      - name: Collect
+        run: |
+          mkdir artifact
+          find upstream/forge/build/libs -type f -name '*.jar' ! -name '*-sources.jar' -exec cp {} artifact/ \;
+          ls -lah artifact
       - uses: actions/upload-artifact@v4
         with:
-          name: tooltip-area-patch
-          path: build/libs/*.jar
+          name: Tooltip-Overhaul-1.20.1-Tooltip-Area-Patch
+          path: artifact/*.jar
+          if-no-files-found: error
