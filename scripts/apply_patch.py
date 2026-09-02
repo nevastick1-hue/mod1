@@ -21,14 +21,13 @@ extra = """
     public static int TOOLTIP_AREA_BOTTOM = 80;
 """
 if "TOOLTIP_AREA_ENABLED" not in s:
-    if needle not in s:
-        raise RuntimeError("Config anchor not found")
+    if needle not in s: raise RuntimeError("Config anchor not found")
     cfg.write_text(s.replace(needle, needle + extra))
 
 pos = Path("upstream/common/src/main/java/dev/xylonity/tooltipoverhaul/client/layout/TooltipPositionCalculator.java")
 s = pos.read_text()
-needle = "        return new Vector2f(posX, posY);"
-extra = """        if (TooltipsConfig.TOOLTIP_AREA_ENABLED) {
+needle = "        return new Vec2(posX - viewOffsetX, posY - viewOffsetY);"
+extra = """        if (isMainTooltip && TooltipsConfig.TOOLTIP_AREA_ENABLED) {
             if (TooltipsConfig.TOOLTIP_AREA_RESTRICT_X) {
                 float minX = TooltipsConfig.TOOLTIP_AREA_LEFT;
                 float maxX = Math.max(minX, screenWidth - TooltipsConfig.TOOLTIP_AREA_RIGHT - tooltipWidth);
@@ -43,6 +42,5 @@ extra = """        if (TooltipsConfig.TOOLTIP_AREA_ENABLED) {
 
 """
 if "TOOLTIP_AREA_ENABLED" not in s:
-    if needle not in s:
-        raise RuntimeError("Position anchor not found")
+    if needle not in s: raise RuntimeError("Position anchor not found")
     pos.write_text(s.replace(needle, extra + needle))
