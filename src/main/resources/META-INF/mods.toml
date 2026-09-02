@@ -1,0 +1,14 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="MIT"
+[[mods]]
+modId="tooltipareapatch"
+version="1.0.0"
+displayName="Tooltip Area Patch"
+description='Configurable tooltip positioning area for Tooltip Overhaul.'
+[[dependencies.tooltipareapatch]]
+modId="forge"
+mandatory=true
+versionRange="[47,)"
+ordering="NONE"
+side="CLIENT"
