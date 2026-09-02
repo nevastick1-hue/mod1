@@ -26,7 +26,9 @@ jobs:
         run: python3 scripts/apply_patch.py
       - name: Build
         working-directory: upstream
-        run: ./gradlew :forge:build --no-daemon
+        run: |
+          chmod +x gradlew
+          ./gradlew :forge:build --stacktrace --info --no-daemon
       - name: Prepare artifact
         run: |
           mkdir -p artifact
