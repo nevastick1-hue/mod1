@@ -2,72 +2,39 @@ name: Build Patched Tooltip Overhaul
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
-
-permissions:
-  contents: read
 
 jobs:
   build:
-    name: Build patched Forge jar
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout patch repository
+      - name: Checkout patch
         uses: actions/checkout@v4
-
-      - name: Checkout upstream source
+      - name: Checkout upstream
         uses: actions/checkout@v4
         with:
           repository: Xylonity/Tooltip-Overhaul
           ref: 1.20.1-4/rewrite
           path: upstream
-
-      - name: Setup Java
+      - name: Setup Java 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "21"
-
+          java-version: '21'
       - name: Apply patch
-        shell: bash
-        run: |
-          cat > /tmp/patch.py <<'PY'
-          from pathlib import Path
-          cfg = Path("upstream/common/src/main/java/dev/xylonity/tooltipoverhaul/config/TooltipsConfig.java")
-          s = cfg.read_text()
-          needle = "    public static int TOOLTIP_POSITION_X = 0;"
-          extra = '''\n\n    @ConfigEntry(category = "layout", comment = "Enable custom tooltip area")\n    public static boolean TOOLTIP_AREA_ENABLED = true;\n    @ConfigEntry(category = "layout", comment = "Restrict X")\n    public static boolean TOOLTIP_AREA_RESTRICT_X = true;\n    @ConfigEntry(category = "layout", comment = "Restrict Y")\n    public static boolean TOOLTIP_AREA_RESTRICT_Y = true;\n    @ConfigEntry(category = "layout", comment = "Left boundary")\n    public static int TOOLTIP_AREA_LEFT = 950;\n    @ConfigEntry(category = "layout", comment = "Top boundary")\n    public static int TOOLTIP_AREA_TOP = 80;\n    @ConfigEntry(category = "layout", comment = "Right margin")\n    public static int TOOLTIP_AREA_RIGHT = 30;\n    @ConfigEntry(category = "layout", comment = "Bottom margin")\n    public static int TOOLTIP_AREA_BOTTOM = 80;'''
-          if "TOOLTIP_AREA_ENABLED" not in s:
-              assert needle in s, "config anchor not found"
-              cfg.write_text(s.replace(needle, needle + extra))
-          pos = Path("upstream/common/src/main/java/dev/xylonity/tooltipoverhaul/client/layout/TooltipPositionCalculator.java")
-          s = pos.read_text()
-          needle = "        return new Vector2f(posX, posY);"
-          extra = '''        if (TooltipsConfig.TOOLTIP_AREA_ENABLED) {\n            if (TooltipsConfig.TOOLTIP_AREA_RESTRICT_X) {\n                float minX = TooltipsConfig.TOOLTIP_AREA_LEFT;\n                float maxX = Math.max(minX, screenWidth - TooltipsConfig.TOOLTIP_AREA_RIGHT - tooltipWidth);\n                posX = Math.max(minX, Math.min(maxX, posX));\n            }\n            if (TooltipsConfig.TOOLTIP_AREA_RESTRICT_Y) {\n                float minY = TooltipsConfig.TOOLTIP_AREA_TOP;\n                float maxY = Math.max(minY, screenHeight - TooltipsConfig.TOOLTIP_AREA_BOTTOM - tooltipHeight);\n                posY = Math.max(minY, Math.min(maxY, posY));\n            }\n        }\n\n'''
-          if "TOOLTIP_AREA_ENABLED" not in s:
-              assert needle in s, "position anchor not found"
-              pos.write_text(s.replace(needle, extra + needle))
-          PY
-          python3 /tmp/patch.py
-
-      - name: Build Forge
+        run: python3 scripts/apply_patch.py
+      - name: Build
         working-directory: upstream
-        run: |
-          chmod +x gradlew
-          ./gradlew :forge:build --no-daemon
-
-      - name: Collect jar
+        run: ./gradlew :forge:build --no-daemon
+      - name: Prepare artifact
         run: |
           mkdir -p artifact
-          find upstream/forge/build/libs -type f -name "*.jar" ! -name "*-sources.jar" -exec cp {} artifact/ \;
-          ls -la artifact
-
-      - name: Upload jar
+          cp upstream/forge/build/libs/*.jar artifact/ || true
+          rm -f artifact/*-sources.jar
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Tooltip-Overhaul-Tooltip-Area-Patch
+          name: patched-tooltip-overhaul
           path: artifact/*.jar
           if-no-files-found: error
