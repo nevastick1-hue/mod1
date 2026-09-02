@@ -3,12 +3,16 @@ loaderVersion="[47,)"
 license="MIT"
 [[mods]]
 modId="tooltipareapatch"
-version="1.0.0"
+version="${file.jarVersion}"
 displayName="Tooltip Area Patch"
-description='Configurable tooltip positioning area for Tooltip Overhaul.'
+description="""Client-side tooltip positioning utility."""
 [[dependencies.tooltipareapatch]]
 modId="forge"
 mandatory=true
 versionRange="[47,)"
-ordering="NONE"
+side="CLIENT"
+[[dependencies.tooltipareapatch]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.20.1,1.21)"
 side="CLIENT"
